@@ -31,10 +31,19 @@ a specific path.
 ```bash
 git clone <repo-url> go
 cd go
+npm install               # install deps INTO this repo (required — see below)
 npm install -g .          # links the binary AND runs setup
 ```
 
-That single command:
+The first command installs dependencies (`inquirer`) into this repo's own
+`node_modules`. **This step is not optional.** A global install (`npm install
+-g .` / `npm link`) only *symlinks* the `go-helper` binary back to this source
+tree — it does not install deps here. Node then resolves `require('inquirer')`
+starting from this tree, so without a local `node_modules` the linked binary
+fails at runtime with `Error: Cannot find module 'inquirer'`. (If you ever hit
+that error, just run `npm install` in the repo.)
+
+The second command:
 1. links the `go-helper` binary onto your `PATH`,
 2. triggers the **postinstall hook**, which seeds an empty `config.json` (if you
    don't have one) and adds `source "<repo>/go.sh"` to your `~/.bashrc` (or
@@ -61,6 +70,7 @@ run `./install.sh` (or add the `source` line) yourself.
 If you'd rather wire it by hand:
 
 ```bash
+npm install                                    # local deps (so the link resolves them)
 npm link                                       # go-helper on PATH
 echo 'source "'"$PWD"'/go.sh"' >> ~/.bashrc    # or ~/.zshrc
 ```
@@ -169,6 +179,15 @@ If `go` isn't found after installing:
 1. Start a new shell, or `source ~/.bashrc` (or `~/.zshrc`).
 2. Confirm the line is present: `grep go.sh ~/.bashrc`.
 3. Confirm the binary is linked: `command -v go-helper`.
+
+If `go` runs but fails with `Error: Cannot find module 'inquirer'` (or another
+dependency), the repo is missing its local `node_modules`. The global install
+only symlinks the `go-helper` binary back here, so Node resolves dependencies
+from this tree. Fix it by installing deps in the repo:
+
+```bash
+cd <repo> && npm install
+```
 
 If tab completion isn't working, reload your shell config. `jq` makes
 completion faster but isn't required (there's a grep/sed fallback).
