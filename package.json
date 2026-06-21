@@ -6,7 +6,9 @@
   "bin": {
     "go-helper": "./index.js"
   },
-  "scripts": {},
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
   "keywords": ["cli", "navigation", "directory"],
   "author": "",
   "license": "MIT",

@@ -27,25 +27,38 @@ a specific path.
 ```bash
 git clone <repo-url> go
 cd go
-./install.sh
+npm install -g .          # links the binary AND runs setup
 ```
 
-The installer:
-1. installs dependencies (`npm install`),
-2. links the `go-helper` binary onto your `PATH` (`npm link`),
-3. creates an empty `config.json` if you don't have one yet,
-4. adds `source "<repo>/go.sh"` to your `~/.bashrc` (or `~/.zshrc`).
+That single command:
+1. links the `go-helper` binary onto your `PATH`,
+2. triggers the **postinstall hook**, which seeds an empty `config.json` (if you
+   don't have one) and adds `source "<repo>/go.sh"` to your `~/.bashrc` (or
+   `~/.zshrc`).
 
 Then start a new shell (or `source ~/.bashrc`) and you're ready.
 
+`./install.sh` does the same thing (`npm install` + `npm link`) if you prefer a
+script.
+
+### The postinstall hook
+
+`npm install` runs `scripts/postinstall.js` automatically. It seeds the config
+and wires your shell rc (idempotently — re-running never duplicates the line).
+It does **not** put `go-helper` on your `PATH` — only a global/link install
+does that — so use `npm install -g .` or `npm link`, not a bare local install.
+
+The hook is skipped when `CI` is set, when run with `npm install
+--ignore-scripts`, or when `GO_SKIP_POSTINSTALL=1` is exported. In those cases
+run `./install.sh` (or add the `source` line) yourself.
+
 ### Manual install
 
-If you'd rather not run the script:
+If you'd rather wire it by hand:
 
 ```bash
-npm install
-npm link
-echo 'source "'"$PWD"'/go.sh"' >> ~/.bashrc   # or ~/.zshrc
+npm link                                       # go-helper on PATH
+echo 'source "'"$PWD"'/go.sh"' >> ~/.bashrc    # or ~/.zshrc
 ```
 
 ### How it finds its files
