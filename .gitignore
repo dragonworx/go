@@ -1,0 +1,6 @@
+node_modules/
+
+# Per-machine state (created at runtime)
+config.json
+.usage.json
+.jump_target

@@ -3,7 +3,7 @@
 
 _go_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local config_file="$HOME/dev/go/config.json"
+  local config_file="${GO_HOME:-$HOME/dev/go}/config.json"
 
   # If config file doesn't exist, no completion
   if [ ! -f "$config_file" ]; then
@@ -20,8 +20,8 @@ _go_completion() {
     locations=$(grep -o '"[^"]*"[[:space:]]*:' "$config_file" | sed 's/"//g' | sed 's/[[:space:]]*://')
   fi
 
-  # Add command flags
-  local flags="--add --remove --list --help"
+  # Add command tokens (symbol form is primary; long flags remain as aliases)
+  local flags="+ - ? --add --remove --list --help"
 
   # Combine locations and flags for completion
   local options="$locations $flags"

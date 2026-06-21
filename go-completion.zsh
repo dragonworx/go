@@ -2,7 +2,7 @@
 # Zsh completion for the 'go' directory navigation tool
 
 _go_completion() {
-  local config_file="$HOME/dev/go/config.json"
+  local config_file="${GO_HOME:-$HOME/dev/go}/config.json"
 
   # If config file doesn't exist, no completion
   if [ ! -f "$config_file" ]; then
@@ -18,12 +18,15 @@ _go_completion() {
     locations=(${(f)"$(grep -o '"[^"]*"[[:space:]]*:' "$config_file" | sed 's/"//g' | sed 's/[[:space:]]*://')"})
   fi
 
-  # Add command flags
+  # Add command tokens (symbol form is primary; long flags remain as aliases)
   local -a flags
   flags=(
+    '+:Add current directory as a bookmark'
+    '-:Remove a saved bookmark'
+    '?:List bookmarks, most recently used first'
     '--add:Add current directory as a bookmark'
     '--remove:Remove a saved bookmark'
-    '--list:List all saved bookmarks'
+    '--list:List bookmarks, most recently used first'
     '--help:Show help information'
   )
 

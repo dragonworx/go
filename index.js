@@ -5,9 +5,18 @@ const path = require('path');
 const inquirer = require('inquirer');
 const readline = require('readline');
 
-const CONFIG_DIR = path.join(require('os').homedir(), 'dev/go');
+// State lives next to the code by default, so the repo works from any clone
+// location. `GO_HOME` (exported by go.sh) overrides this when set.
+const CONFIG_DIR = process.env.GO_HOME || __dirname;
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const JUMP_FILE = path.join(CONFIG_DIR, '.jump_target');
+const USAGE_FILE = path.join(CONFIG_DIR, '.usage.json');
+
+// Command aliases. The symbol form is primary; the long flags remain as
+// glob-safe fallbacks (a bare `?` can be expanded by the shell in some dirs).
+const ADD_CMDS = ['+', '--add'];
+const REMOVE_CMDS = ['-', '--remove'];
+const LIST_CMDS = ['?', '--list'];
 
 // Ensure config directory exists
 if (!fs.existsSync(CONFIG_DIR)) {
@@ -96,14 +105,64 @@ function setJumpTarget(targetPath) {
   }
 }
 
+// Load last-used timestamps ({ name: epochMillis }). Stored separately from
+// config.json so the bookmark file stays a clean { name: path } map.
+function loadUsage() {
+  if (fs.existsSync(USAGE_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8'));
+    } catch (err) {
+      return {};
+    }
+  }
+  return {};
+}
+
+function saveUsage(usage) {
+  try {
+    fs.writeFileSync(USAGE_FILE, JSON.stringify(usage, null, 2), 'utf8');
+  } catch (err) {
+    // Usage tracking is best-effort; ignore write failures.
+  }
+}
+
+// Record that a bookmark was just jumped to.
+function touchUsage(name) {
+  const usage = loadUsage();
+  usage[name] = Date.now();
+  saveUsage(usage);
+}
+
+// Order bookmark names by most-recently-used first. Never-used bookmarks keep
+// their original (config) order and sort after used ones (sort is stable).
+function orderByLastUsed(names, usage) {
+  return [...names].sort((a, b) => (usage[b] || 0) - (usage[a] || 0));
+}
+
+// Compact human-readable "time ago" for the list view.
+function timeAgo(ts) {
+  if (!ts) return 'never used';
+  const secs = Math.floor((Date.now() - ts) / 1000);
+  if (secs < 60) return 'just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
 // Main function
 async function main() {
   const args = process.argv.slice(2);
   const config = loadConfig();
   const command = args[0];
 
-  // Handle --add command
-  if (command === '--add') {
+  // Handle add command  (go +)
+  if (ADD_CMDS.includes(command)) {
     const cwd = process.cwd();
     const defaultName = path.basename(cwd);
 
@@ -132,8 +191,8 @@ async function main() {
     return;
   }
 
-  // Handle --remove command
-  if (command === '--remove') {
+  // Handle remove command  (go -)
+  if (REMOVE_CMDS.includes(command)) {
     const locations = Object.keys(config);
 
     if (locations.length === 0) {
@@ -153,22 +212,32 @@ async function main() {
 
     delete config[locationToRemove];
     saveConfig(config);
+    // Drop its usage record too.
+    const usage = loadUsage();
+    if (usage[locationToRemove] !== undefined) {
+      delete usage[locationToRemove];
+      saveUsage(usage);
+    }
     console.log(`Bookmark removed: ${locationToRemove}`);
     return;
   }
 
-  // Handle --list command
-  if (command === '--list') {
+  // Handle list command  (go ?) — ordered by last used, most recent first
+  if (LIST_CMDS.includes(command)) {
     const locations = Object.keys(config);
 
     if (locations.length === 0) {
-      console.log('No bookmarks saved yet. Use "go --add" to add one.');
+      console.log('No bookmarks saved yet. Use "go +" to add one.');
       process.exit(0);
     }
 
-    console.log('\nSaved bookmarks:');
-    locations.forEach(name => {
-      console.log(`  ${name} -> ${config[name]}`);
+    const usage = loadUsage();
+    const ordered = orderByLastUsed(locations, usage);
+    const pad = Math.max(...ordered.map(n => n.length));
+
+    console.log('\nBookmarks (most recently used first):\n');
+    ordered.forEach(name => {
+      console.log(`  ${name.padEnd(pad)}  ${config[name]}  (${timeAgo(usage[name])})`);
     });
     return;
   }
@@ -178,9 +247,12 @@ async function main() {
     const locations = Object.keys(config);
 
     if (locations.length === 0) {
-      console.log('No bookmarks saved yet. Use "go --add" to add one.');
+      console.log('No bookmarks saved yet. Use "go +" to add one.');
       process.exit(0);
     }
+
+    // Most-recently-used bookmarks float to the top of the menu.
+    const ordered = orderByLastUsed(locations, loadUsage());
 
     console.log('\n[Press ESC to cancel]\n');
     const { selectedLocation } = await promptWithEscSupport([
@@ -188,12 +260,13 @@ async function main() {
         type: 'list',
         name: 'selectedLocation',
         message: 'Select a location to jump to:',
-        choices: locations
+        choices: ordered
       }
     ]);
 
     // Write the path to temp file for shell wrapper to read
     setJumpTarget(config[selectedLocation]);
+    touchUsage(selectedLocation);
     return;
   }
 
@@ -202,9 +275,10 @@ async function main() {
 
   if (config[locationName]) {
     setJumpTarget(config[locationName]);
+    touchUsage(locationName);
   } else {
     console.error(`Error: Location "${locationName}" not found`);
-    console.error(`Use "go --list" to see available bookmarks or "go --add" to create one.`);
+    console.error(`Use "go ?" to see available bookmarks or "go +" to create one.`);
     process.exit(1);
   }
 }

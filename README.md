@@ -1,148 +1,134 @@
 # go - Quick Directory Navigation Tool
 
-A simple command-line tool for bookmarking and quickly jumping to frequently used directories.
+A small command-line tool for bookmarking directories and jumping between them.
+Bookmarks are ordered by how recently you used them, so your busiest folders
+stay at the top.
+
+## Commands
+
+| Command  | Action                                                  |
+|----------|---------------------------------------------------------|
+| `go`     | Interactive picker — jump to a bookmark (recent first)  |
+| `go <name>` | Jump straight to a bookmark by name (tab-completes)  |
+| `go +`   | Add the current directory as a bookmark                 |
+| `go -`   | Remove a bookmark (interactive picker)                  |
+| `go ?`   | List all bookmarks, most recently used first            |
+
+The long flags `--add`, `--remove`, and `--list` still work as aliases.
 
 ## Installation
 
-The tool is already installed and configured! The `go` command is now available in your shell.
+**Requires:** Node.js and npm (the `go-helper` binary runs on Node; `install.sh`
+checks for `npm`).
 
-## Location
+Clone anywhere — the tool figures out its own location, so you are not tied to
+a specific path.
 
-- Tool directory: `~/dev/go`
-- Config file: `~/dev/go/config.json`
-- Shell wrapper: `~/dev/go/go.sh`
+```bash
+git clone <repo-url> go
+cd go
+./install.sh
+```
+
+The installer:
+1. installs dependencies (`npm install`),
+2. links the `go-helper` binary onto your `PATH` (`npm link`),
+3. creates an empty `config.json` if you don't have one yet,
+4. adds `source "<repo>/go.sh"` to your `~/.bashrc` (or `~/.zshrc`).
+
+Then start a new shell (or `source ~/.bashrc`) and you're ready.
+
+### Manual install
+
+If you'd rather not run the script:
+
+```bash
+npm install
+npm link
+echo 'source "'"$PWD"'/go.sh"' >> ~/.bashrc   # or ~/.zshrc
+```
+
+### How it finds its files
+
+`go.sh` resolves its own directory and exports `GO_HOME`, which `index.js` and
+the completion scripts read. State (`config.json`, `.usage.json`,
+`.jump_target`) lives inside the repo and is git-ignored, so each machine keeps
+its own bookmarks and the repo stays clean. To store state elsewhere, export
+`GO_HOME=/some/path` before sourcing `go.sh`.
 
 ## Usage
 
-### Jumping to a location (main use)
+### Jumping
 
-Simply run `go` with no arguments to see an interactive list of your bookmarked locations:
-
-```bash
-go
-```
-
-Use arrow keys to select a location and press Enter. You'll be instantly transported to that directory!
-
-### Jumping directly by name
-
-If you know the exact name of your bookmark, you can jump directly:
+Run `go` with no arguments for an interactive list (most recently used first),
+or jump directly by name:
 
 ```bash
-go myapp
-```
-
-**Tab completion is supported!** Start typing a location name and press Tab to auto-complete:
-
-```bash
-go de<TAB>    # Completes to "go demo" if "demo" is a saved location
-go --a<TAB>   # Completes to "go --add"
+go            # pick from the list
+go myapp      # jump straight there (Tab completes names and commands)
 ```
 
 ### Adding a bookmark
 
-Navigate to a directory you want to bookmark, then run:
-
-```bash
-go --add
-```
-
-You'll be prompted to enter a memorable name (e.g., "projects", "docs", "configs").
-
-Example:
 ```bash
 cd ~/projects/my-app
-go --add
-# Name: myapp
+go +
+# Enter a name (defaults to the folder name)
 ```
 
-### Listing all bookmarks
-
-To see all your saved bookmarks:
+### Listing
 
 ```bash
-go --list
+go ?
 ```
 
-This displays all bookmarks in the format: `name -> path`
+```
+Bookmarks (most recently used first):
 
-### Removing a bookmark
+  myapp     /home/you/projects/my-app  (just now)
+  configs   /etc/nginx                 (3d ago)
+  docs      /home/you/documents        (never used)
+```
 
-To remove a bookmark:
+### Removing
 
 ```bash
-go --remove
+go -
+# Pick the bookmark to delete from the list
 ```
 
-You'll see an interactive list to select which bookmark to delete.
+> **Note on `go ?`:** `?` is a shell glob. In the rare case your current
+> directory contains a single-character filename, the shell may expand `?`
+> before `go` sees it — quote it (`go '?'`) or use `go --list` in that case.
 
 ### Editing bookmarks manually
 
-The bookmarks are stored in `~/dev/go/config.json` as a simple JSON file:
+`config.json` is a plain `{ "name": "/path" }` map you can edit directly:
 
 ```json
 {
-  "myapp": "/home/user/projects/my-app",
-  "configs": "/etc/nginx",
-  "docs": "/home/user/documents"
+  "myapp": "/home/you/projects/my-app",
+  "configs": "/etc/nginx"
 }
 ```
 
-You can edit this file directly to add, remove, or update bookmarks.
-
-## Examples
-
-```bash
-# Bookmark your home directory
-cd ~
-go --add
-# Name it "home"
-
-# Bookmark a project
-cd ~/projects/important-project
-go --add
-# Name it "important"
-
-# List all bookmarks
-go --list
-
-# Jump to bookmarked location (interactive)
-go
-# Select "important" from the list
-
-# Or jump directly
-go home
-
-# Remove a bookmark
-go --remove
-# Select which one to delete
-```
+Usage timestamps are tracked separately in `.usage.json`, so editing
+`config.json` never disturbs your recency ordering.
 
 ## Troubleshooting
 
-If the `go` command is not found after installation:
-1. Make sure `~/.bashrc` has been sourced: `source ~/.bashrc`
-2. Verify the line was added to `~/.bashrc`: `tail ~/.bashrc`
-3. For new terminal sessions, the command will be automatically available
+If `go` isn't found after installing:
+1. Start a new shell, or `source ~/.bashrc` (or `~/.zshrc`).
+2. Confirm the line is present: `grep go.sh ~/.bashrc`.
+3. Confirm the binary is linked: `command -v go-helper`.
 
-If tab completion is not working:
-1. Reload your shell configuration: `source ~/.bashrc` (or `source ~/.zshrc` for zsh)
-2. Verify the completion scripts exist in `~/dev/go/`
-3. The completion script requires `jq` for optimal performance (falls back to grep/sed if not available)
+If tab completion isn't working, reload your shell config. `jq` makes
+completion faster but isn't required (there's a grep/sed fallback).
 
 ## Uninstalling
 
-To remove the tool:
-
 ```bash
-# Remove the npm global link
-cd ~/dev/go && npm unlink -g
-
-# Remove the tool directory
-rm -rf ~/dev/go
-
-# Remove the line from .bashrc
-# Edit ~/.bashrc and remove the lines:
-# # Load 'go' directory navigation tool
-# source ~/dev/go/go.sh
+npm unlink -g go-cli
+# Remove the "source .../go.sh" line from your ~/.bashrc or ~/.zshrc
+# Then delete the repo directory.
 ```
