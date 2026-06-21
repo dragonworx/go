@@ -21,7 +21,7 @@ _go_completion() {
   fi
 
   # Add command tokens (symbol form is primary; long flags remain as aliases)
-  local flags="+ - ? --add --remove --list --help"
+  local flags="+ - ? ! --add --remove --list --prune --no-color --help"
 
   # Combine locations and flags for completion
   local options="$locations $flags"

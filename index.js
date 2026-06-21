@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const inquirer = require('inquirer');
 const readline = require('readline');
+const colors = require('./colors');
 
 // State lives next to the code by default, so the repo works from any clone
 // location. `GO_HOME` (exported by go.sh) overrides this when set.
@@ -17,10 +18,18 @@ const USAGE_FILE = path.join(CONFIG_DIR, '.usage.json');
 const ADD_CMDS = ['+', '--add'];
 const REMOVE_CMDS = ['-', '--remove'];
 const LIST_CMDS = ['?', '--list'];
+const PRUNE_CMDS = ['!', '--prune'];
 
 // Ensure config directory exists
 if (!fs.existsSync(CONFIG_DIR)) {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
+}
+
+// Decide whether to emit ANSI colors. Disabled by `--no-color`, by NO_COLOR
+// (https://no-color.org/), or when stdout isn't a TTY (e.g. piped output).
+function configureColor(args) {
+  const off = args.includes('--no-color') || process.env.NO_COLOR || !process.stdout.isTTY;
+  colors.setEnabled(!off);
 }
 
 // Wrapper for inquirer.prompt that adds ESC key support
@@ -157,7 +166,11 @@ function timeAgo(ts) {
 
 // Main function
 async function main() {
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  configureColor(rawArgs);
+  // Strip the global `--no-color` flag so it can sit anywhere on the line
+  // without being mistaken for a command or bookmark name.
+  const args = rawArgs.filter(a => a !== '--no-color');
   const config = loadConfig();
   const command = args[0];
 
@@ -235,10 +248,47 @@ async function main() {
     const ordered = orderByLastUsed(locations, usage);
     const pad = Math.max(...ordered.map(n => n.length));
 
-    console.log('\nBookmarks (most recently used first):\n');
+    console.log('\n' + colors.bold('Bookmarks') + colors.dim(' (most recently used first):') + '\n');
     ordered.forEach(name => {
-      console.log(`  ${name.padEnd(pad)}  ${config[name]}  (${timeAgo(usage[name])})`);
+      // Pad on the visible text first, then color — padEnd must run before the
+      // (zero-width) escape codes are added or alignment breaks.
+      const label = colors.boldCyan(name.padEnd(pad));
+      // Dim and flag missing paths so stale bookmarks stand out.
+      const exists = fs.existsSync(config[name]);
+      const pathCol = exists
+        ? colors.green(config[name])
+        : colors.dimStrike(config[name]) + colors.red(' (missing)');
+      const ago = colors.yellow(timeAgo(usage[name]));
+      console.log(`  ${label}  ${pathCol}  ${colors.dim('(') + ago + colors.dim(')')}`);
     });
+    return;
+  }
+
+  // Handle prune command  (go !) — drop bookmarks whose paths no longer exist
+  if (PRUNE_CMDS.includes(command)) {
+    const locations = Object.keys(config);
+
+    if (locations.length === 0) {
+      console.log('No bookmarks saved yet. Use "go +" to add one.');
+      process.exit(0);
+    }
+
+    const missing = locations.filter(name => !fs.existsSync(config[name]));
+
+    if (missing.length === 0) {
+      console.log(colors.green('All bookmarks point to existing paths. Nothing to prune.'));
+      return;
+    }
+
+    const usage = loadUsage();
+    missing.forEach(name => {
+      console.log(`${colors.red('Removed')} ${colors.boldCyan(name)} ${colors.dim('->')} ${colors.dimStrike(config[name])}`);
+      delete config[name];
+      delete usage[name];
+    });
+    saveConfig(config);
+    saveUsage(usage);
+    console.log('\n' + colors.green(`Pruned ${missing.length} stale bookmark${missing.length === 1 ? '' : 's'}.`));
     return;
   }
 

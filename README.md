@@ -13,8 +13,12 @@ stay at the top.
 | `go +`   | Add the current directory as a bookmark                 |
 | `go -`   | Remove a bookmark (interactive picker)                  |
 | `go ?`   | List all bookmarks, most recently used first            |
+| `go !`   | Prune bookmarks whose paths no longer exist             |
 
-The long flags `--add`, `--remove`, and `--list` still work as aliases.
+The long flags `--add`, `--remove`, `--list`, and `--prune` still work as
+aliases. Add `--no-color` to any command for plain, un-colored output (colors
+are also disabled automatically when output isn't a terminal or when `NO_COLOR`
+is set).
 
 ## Installation
 
@@ -103,6 +107,36 @@ Bookmarks (most recently used first):
   docs      /home/you/documents        (never used)
 ```
 
+The list is colorized: names in bold cyan, paths in green, and the "time ago"
+in yellow. A bookmark whose path no longer exists is shown struck-through with
+a red `(missing)` marker so you can spot stale entries at a glance. Pass
+`--no-color` for plain output:
+
+```bash
+go ? --no-color
+```
+
+### Pruning stale bookmarks
+
+Over time some bookmarked directories get moved or deleted. `go !` (or
+`go --prune`) walks every bookmark and removes the ones whose paths no longer
+exist, reporting what it dropped:
+
+```bash
+go !
+```
+
+```
+Removed oldproject -> /home/you/projects/old
+Removed scratch    -> /tmp/scratch
+
+Pruned 2 stale bookmarks.
+```
+
+If everything still resolves it reports `Nothing to prune` and leaves your
+bookmarks untouched. Their usage timestamps are cleaned up alongside the
+removed entries.
+
 ### Removing
 
 ```bash
@@ -110,9 +144,10 @@ go -
 # Pick the bookmark to delete from the list
 ```
 
-> **Note on `go ?`:** `?` is a shell glob. In the rare case your current
-> directory contains a single-character filename, the shell may expand `?`
-> before `go` sees it — quote it (`go '?'`) or use `go --list` in that case.
+> **Note on `go ?` and `go !`:** `?` is a shell glob and `!` triggers history
+> expansion in interactive bash. In the rare case the shell rewrites them
+> before `go` sees them, quote the token (`go '?'`, `go '!'`) or use the long
+> form (`go --list`, `go --prune`).
 
 ### Editing bookmarks manually
 

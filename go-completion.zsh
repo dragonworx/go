@@ -24,9 +24,12 @@ _go_completion() {
     '+:Add current directory as a bookmark'
     '-:Remove a saved bookmark'
     '?:List bookmarks, most recently used first'
+    '\!:Prune bookmarks whose paths no longer exist'
     '--add:Add current directory as a bookmark'
     '--remove:Remove a saved bookmark'
     '--list:List bookmarks, most recently used first'
+    '--prune:Prune bookmarks whose paths no longer exist'
+    '--no-color:Plain output with no ANSI colors'
     '--help:Show help information'
   )
 
