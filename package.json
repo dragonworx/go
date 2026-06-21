@@ -1,0 +1,16 @@
+{
+  "name": "go-cli",
+  "version": "1.0.0",
+  "description": "Quick directory navigation tool",
+  "main": "index.js",
+  "bin": {
+    "go-helper": "./index.js"
+  },
+  "scripts": {},
+  "keywords": ["cli", "navigation", "directory"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^8.2.5"
+  }
+}
