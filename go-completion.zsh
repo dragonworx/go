@@ -18,15 +18,15 @@ _go_completion() {
     locations=(${(f)"$(grep -o '"[^"]*"[[:space:]]*:' "$config_file" | sed 's/"//g' | sed 's/[[:space:]]*://')"})
   fi
 
-  # Add command tokens (symbol form is primary; long flags remain as aliases)
+  # Add command tokens (short flags plus their long-flag aliases)
   local -a flags
   flags=(
-    '+:Add current directory as a bookmark'
-    '-:Remove a saved bookmark'
-    '?:List bookmarks, most recently used first'
-    '\!:Prune bookmarks whose paths no longer exist'
+    '-a:Add current directory as a bookmark'
+    '-d:Delete a saved bookmark'
+    '-l:List bookmarks, most recently used first'
+    '-p:Prune bookmarks whose paths no longer exist'
     '--add:Add current directory as a bookmark'
-    '--remove:Remove a saved bookmark'
+    '--delete:Delete a saved bookmark'
     '--list:List bookmarks, most recently used first'
     '--prune:Prune bookmarks whose paths no longer exist'
     '--no-color:Plain output with no ANSI colors'

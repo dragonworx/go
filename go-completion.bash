@@ -20,8 +20,8 @@ _go_completion() {
     locations=$(grep -o '"[^"]*"[[:space:]]*:' "$config_file" | sed 's/"//g' | sed 's/[[:space:]]*://')
   fi
 
-  # Add command tokens (symbol form is primary; long flags remain as aliases)
-  local flags="+ - ? ! --add --remove --list --prune --no-color --help"
+  # Add command tokens (short flags plus their long-flag aliases)
+  local flags="-a -d -l -p --add --delete --list --prune --no-color --help"
 
   # Combine locations and flags for completion
   local options="$locations $flags"

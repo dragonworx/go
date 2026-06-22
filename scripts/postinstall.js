@@ -75,7 +75,7 @@ try {
   }
 
   note(`Done. Start a new shell or run: ${SOURCE_LINE}`);
-  note('Then: go +  (add)   go -  (remove)   go ?  (list)   go  (jump)');
+  note('Then: go -a  (add)   go -d  (delete)   go -l  (list)   go  (jump)');
 } catch (err) {
   // Never break `npm install` over setup convenience.
   note(`Setup skipped (${err.message}). You can run ./install.sh manually.`);

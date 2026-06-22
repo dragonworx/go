@@ -13,12 +13,11 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const JUMP_FILE = path.join(CONFIG_DIR, '.jump_target');
 const USAGE_FILE = path.join(CONFIG_DIR, '.usage.json');
 
-// Command aliases. The symbol form is primary; the long flags remain as
-// glob-safe fallbacks (a bare `?` can be expanded by the shell in some dirs).
-const ADD_CMDS = ['+', '--add'];
-const REMOVE_CMDS = ['-', '--remove'];
-const LIST_CMDS = ['?', '--list'];
-const PRUNE_CMDS = ['!', '--prune'];
+// Command aliases. Each command has a short flag and a long flag.
+const ADD_CMDS = ['-a', '--add'];
+const REMOVE_CMDS = ['-d', '--delete'];
+const LIST_CMDS = ['-l', '--list'];
+const PRUNE_CMDS = ['-p', '--prune'];
 
 // Ensure config directory exists
 if (!fs.existsSync(CONFIG_DIR)) {
@@ -174,7 +173,7 @@ async function main() {
   const config = loadConfig();
   const command = args[0];
 
-  // Handle add command  (go +)
+  // Handle add command  (go -a)
   if (ADD_CMDS.includes(command)) {
     const cwd = process.cwd();
     const defaultName = path.basename(cwd);
@@ -204,7 +203,7 @@ async function main() {
     return;
   }
 
-  // Handle remove command  (go -)
+  // Handle delete command  (go -d)
   if (REMOVE_CMDS.includes(command)) {
     const locations = Object.keys(config);
 
@@ -235,12 +234,12 @@ async function main() {
     return;
   }
 
-  // Handle list command  (go ?) — ordered by last used, most recent first
+  // Handle list command  (go -l) — ordered by last used, most recent first
   if (LIST_CMDS.includes(command)) {
     const locations = Object.keys(config);
 
     if (locations.length === 0) {
-      console.log('No bookmarks saved yet. Use "go +" to add one.');
+      console.log('No bookmarks saved yet. Use "go -a" to add one.');
       process.exit(0);
     }
 
@@ -264,12 +263,12 @@ async function main() {
     return;
   }
 
-  // Handle prune command  (go !) — drop bookmarks whose paths no longer exist
+  // Handle prune command  (go -p) — drop bookmarks whose paths no longer exist
   if (PRUNE_CMDS.includes(command)) {
     const locations = Object.keys(config);
 
     if (locations.length === 0) {
-      console.log('No bookmarks saved yet. Use "go +" to add one.');
+      console.log('No bookmarks saved yet. Use "go -a" to add one.');
       process.exit(0);
     }
 
@@ -297,7 +296,7 @@ async function main() {
     const locations = Object.keys(config);
 
     if (locations.length === 0) {
-      console.log('No bookmarks saved yet. Use "go +" to add one.');
+      console.log('No bookmarks saved yet. Use "go -a" to add one.');
       process.exit(0);
     }
 
@@ -328,7 +327,7 @@ async function main() {
     touchUsage(locationName);
   } else {
     console.error(`Error: Location "${locationName}" not found`);
-    console.error(`Use "go ?" to see available bookmarks or "go +" to create one.`);
+    console.error(`Use "go -l" to see available bookmarks or "go -a" to create one.`);
     process.exit(1);
   }
 }
