@@ -18,6 +18,7 @@ const ADD_CMDS = ['-a', '--add'];
 const REMOVE_CMDS = ['-d', '--delete'];
 const LIST_CMDS = ['-l', '--list'];
 const PRUNE_CMDS = ['-p', '--prune'];
+const HELP_CMDS = ['-h', '--help'];
 
 // Ensure config directory exists
 if (!fs.existsSync(CONFIG_DIR)) {
@@ -147,6 +148,28 @@ function orderByLastUsed(names, usage) {
   return [...names].sort((a, b) => (usage[b] || 0) - (usage[a] || 0));
 }
 
+// Print usage / available commands.
+function printHelp() {
+  const b = colors.boldCyan;
+  console.log(`
+${colors.bold('go')} — jump between bookmarked directories
+
+${colors.bold('Usage:')}
+  ${b('go')}                  Interactively select a bookmark to jump to
+  ${b('go <name>')}           Jump to the bookmark named <name>
+
+${colors.bold('Commands:')}
+  ${b('-a, --add')}           Bookmark the current directory
+  ${b('-d, --delete')}        Remove a bookmark (interactive)
+  ${b('-l, --list')}          List bookmarks, most recently used first
+  ${b('-p, --prune')}         Remove bookmarks whose paths no longer exist
+  ${b('-h, --help')}          Show this help
+
+${colors.bold('Options:')}
+  ${b('--no-color')}          Disable colored output
+`);
+}
+
 // Compact human-readable "time ago" for the list view.
 function timeAgo(ts) {
   if (!ts) return 'never used';
@@ -172,6 +195,12 @@ async function main() {
   const args = rawArgs.filter(a => a !== '--no-color');
   const config = loadConfig();
   const command = args[0];
+
+  // Handle help command  (go -h)
+  if (HELP_CMDS.includes(command)) {
+    printHelp();
+    return;
+  }
 
   // Handle add command  (go -a)
   if (ADD_CMDS.includes(command)) {

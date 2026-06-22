@@ -14,9 +14,10 @@ stay at the top.
 | `go -d`  | Delete a bookmark (interactive picker)                  |
 | `go -l`  | List all bookmarks, most recently used first            |
 | `go -p`  | Prune bookmarks whose paths no longer exist             |
+| `go -h`  | Show available commands and usage                       |
 
-The long flags `--add`, `--delete`, `--list`, and `--prune` work as aliases for
-`-a`, `-d`, `-l`, and `-p` respectively. Add `--no-color` to any command for
+The long flags `--add`, `--delete`, `--list`, `--prune`, and `--help` work as
+aliases for `-a`, `-d`, `-l`, `-p`, and `-h` respectively. Add `--no-color` to any command for
 plain, un-colored output (colors are also disabled automatically when output
 isn't a terminal or when `NO_COLOR` is set).
 

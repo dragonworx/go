@@ -25,6 +25,7 @@ _go_completion() {
     '-d:Delete a saved bookmark'
     '-l:List bookmarks, most recently used first'
     '-p:Prune bookmarks whose paths no longer exist'
+    '-h:Show help information'
     '--add:Add current directory as a bookmark'
     '--delete:Delete a saved bookmark'
     '--list:List bookmarks, most recently used first'
