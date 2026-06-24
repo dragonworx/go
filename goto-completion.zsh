@@ -1,8 +1,8 @@
 #!/bin/zsh
-# Zsh completion for the 'go' directory navigation tool
+# Zsh completion for the 'goto' directory navigation tool
 
-_go_completion() {
-  local config_file="${GO_HOME:-$HOME/dev/go}/config.json"
+_goto_completion() {
+  local config_file="${GOTO_HOME:-$HOME/.goto}/config.json"
 
   # If config file doesn't exist, no completion
   if [ ! -f "$config_file" ]; then
@@ -23,15 +23,21 @@ _go_completion() {
   flags=(
     '-a:Add current directory as a bookmark'
     '-d:Delete a saved bookmark'
+    '-r:Rename a bookmark'
     '-l:List bookmarks, most recently used first'
     '-p:Prune bookmarks whose paths no longer exist'
     '-h:Show help information'
+    '-v:Show the version'
+    '-f:With --add, overwrite an existing bookmark'
     '--add:Add current directory as a bookmark'
     '--delete:Delete a saved bookmark'
+    '--rename:Rename a bookmark'
     '--list:List bookmarks, most recently used first'
     '--prune:Prune bookmarks whose paths no longer exist'
-    '--no-color:Plain output with no ANSI colors'
     '--help:Show help information'
+    '--version:Show the version'
+    '--force:With --add, overwrite an existing bookmark'
+    '--no-color:Plain output with no ANSI colors'
   )
 
   # Offer completions
@@ -46,5 +52,5 @@ _go_completion() {
   esac
 }
 
-# Register the completion function for the 'go' command
-compdef _go_completion go
+# Register the completion function for the 'goto' command
+compdef _goto_completion goto

@@ -1,29 +1,29 @@
 #!/bin/bash
-# Shell wrapper for the 'go' directory navigation tool
-# This must be sourced in your .bashrc or .zshrc to work properly
+# Shell wrapper for the 'goto' directory navigation tool.
+# This must be sourced in your .bashrc or .zshrc to work properly.
 
 # Resolve the directory this script lives in, for both bash and zsh, so the
 # tool works no matter where the repo was cloned. Exported so index.js and the
 # completion scripts use the same location for config/state.
-if [ -z "$GO_HOME" ]; then
+if [ -z "$GOTO_HOME" ]; then
   if [ -n "$BASH_VERSION" ]; then
-    GO_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    GOTO_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   elif [ -n "$ZSH_VERSION" ]; then
-    GO_HOME="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+    GOTO_HOME="$(cd "$(dirname "${(%):-%x}")" && pwd)"
   else
-    GO_HOME="$HOME/dev/go"
+    GOTO_HOME="$HOME/.goto"
   fi
-  export GO_HOME
+  export GOTO_HOME
 fi
 
-go() {
-  local jump_file="$GO_HOME/.jump_target"
+goto() {
+  local jump_file="$GOTO_HOME/.jump_target"
 
   # Remove any existing jump target file
   [ -f "$jump_file" ] && rm -f "$jump_file"
 
   # Run the helper (allows interactive prompts to show)
-  go-helper "$@"
+  goto-helper "$@"
   local exit_code=$?
 
   # Check if a jump target was written
@@ -46,7 +46,7 @@ go() {
 
 # Load shell completion
 if [ -n "$BASH_VERSION" ]; then
-  source "$GO_HOME/go-completion.bash"
+  source "$GOTO_HOME/goto-completion.bash"
 elif [ -n "$ZSH_VERSION" ]; then
-  source "$GO_HOME/go-completion.zsh"
+  source "$GOTO_HOME/goto-completion.zsh"
 fi

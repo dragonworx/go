@@ -1,9 +1,9 @@
 #!/bin/bash
-# Bash completion for the 'go' directory navigation tool
+# Bash completion for the 'goto' directory navigation tool
 
-_go_completion() {
+_goto_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local config_file="${GO_HOME:-$HOME/dev/go}/config.json"
+  local config_file="${GOTO_HOME:-$HOME/.goto}/config.json"
 
   # If config file doesn't exist, no completion
   if [ ! -f "$config_file" ]; then
@@ -21,7 +21,7 @@ _go_completion() {
   fi
 
   # Add command tokens (short flags plus their long-flag aliases)
-  local flags="-a -d -l -p -h --add --delete --list --prune --no-color --help"
+  local flags="-a -d -r -l -p -h -v -f --add --delete --rename --list --prune --help --version --force --no-color"
 
   # Combine locations and flags for completion
   local options="$locations $flags"
@@ -32,5 +32,5 @@ _go_completion() {
   return 0
 }
 
-# Register the completion function for the 'go' command
-complete -F _go_completion go
+# Register the completion function for the 'goto' command
+complete -F _goto_completion goto

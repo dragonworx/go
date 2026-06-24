@@ -1,5 +1,9 @@
 node_modules/
 
+# Leftovers if someone runs `npm link --prefix <repo>` (don't commit these)
+/bin/
+/lib/
+
 # Per-machine state (created at runtime)
 config.json
 .usage.json

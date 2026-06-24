@@ -1,16 +1,21 @@
 {
-  "name": "go-cli",
-  "version": "1.0.0",
-  "description": "Quick directory navigation tool",
+  "name": "goto-cli",
+  "version": "1.1.0",
+  "description": "Quick directory navigation tool — bookmark directories and jump between them",
   "main": "index.js",
   "bin": {
-    "go-helper": "./index.js"
+    "goto-helper": "./index.js"
   },
   "scripts": {
-    "postinstall": "node scripts/postinstall.js"
+    "postinstall": "node scripts/postinstall.js",
+    "setup": "node scripts/setup-shell.js",
+    "test": "node --test"
   },
-  "keywords": ["cli", "navigation", "directory"],
-  "author": "",
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": ["cli", "navigation", "directory", "bookmark", "goto"],
+  "author": "dragonworx <dragonworxau@yahoo.com.au>",
   "license": "MIT",
   "dependencies": {
     "inquirer": "^8.2.5"

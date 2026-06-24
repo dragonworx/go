@@ -5,10 +5,20 @@ const path = require('path');
 const inquirer = require('inquirer');
 const readline = require('readline');
 const colors = require('./colors');
+const pkg = require('./package.json');
+const {
+  validateName,
+  addBookmark,
+  removeBookmark,
+  renameBookmark,
+  pruneBookmarks,
+  orderByLastUsed,
+  timeAgo,
+} = require('./lib');
 
 // State lives next to the code by default, so the repo works from any clone
-// location. `GO_HOME` (exported by go.sh) overrides this when set.
-const CONFIG_DIR = process.env.GO_HOME || __dirname;
+// location. `GOTO_HOME` (exported by goto.sh) overrides this when set.
+const CONFIG_DIR = process.env.GOTO_HOME || __dirname;
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const JUMP_FILE = path.join(CONFIG_DIR, '.jump_target');
 const USAGE_FILE = path.join(CONFIG_DIR, '.usage.json');
@@ -16,9 +26,11 @@ const USAGE_FILE = path.join(CONFIG_DIR, '.usage.json');
 // Command aliases. Each command has a short flag and a long flag.
 const ADD_CMDS = ['-a', '--add'];
 const REMOVE_CMDS = ['-d', '--delete'];
+const RENAME_CMDS = ['-r', '--rename'];
 const LIST_CMDS = ['-l', '--list'];
 const PRUNE_CMDS = ['-p', '--prune'];
 const HELP_CMDS = ['-h', '--help'];
+const VERSION_CMDS = ['-v', '--version'];
 
 // Ensure config directory exists
 if (!fs.existsSync(CONFIG_DIR)) {
@@ -142,142 +154,205 @@ function touchUsage(name) {
   saveUsage(usage);
 }
 
-// Order bookmark names by most-recently-used first. Never-used bookmarks keep
-// their original (config) order and sort after used ones (sort is stable).
-function orderByLastUsed(names, usage) {
-  return [...names].sort((a, b) => (usage[b] || 0) - (usage[a] || 0));
+// Resolve a bookmark and jump to it: verify the path still exists (so a stale
+// entry doesn't silently bump its recency), write the target for the shell
+// wrapper, and record the use. Returns false if the path is missing.
+function jumpTo(name, config) {
+  if (!fs.existsSync(config[name])) {
+    console.error(`Error: "${name}" points to a missing path: ${config[name]}`);
+    console.error('Run "goto -p" to prune stale bookmarks.');
+    return false;
+  }
+  setJumpTarget(config[name]);
+  touchUsage(name);
+  return true;
 }
 
 // Print usage / available commands.
 function printHelp() {
   const b = colors.boldCyan;
   console.log(`
-${colors.bold('go')} — jump between bookmarked directories
+${colors.bold('goto')} — jump between bookmarked directories
 
 ${colors.bold('Usage:')}
-  ${b('go')}                  Interactively select a bookmark to jump to
-  ${b('go <name>')}           Jump to the bookmark named <name>
+  ${b('goto')}                Interactively select a bookmark to jump to
+  ${b('goto <name>')}         Jump to the bookmark named <name>
 
 ${colors.bold('Commands:')}
-  ${b('-a, --add')}           Bookmark the current directory
-  ${b('-d, --delete')}        Remove a bookmark (interactive)
+  ${b('-a, --add [name]')}    Bookmark the current directory (prompts if no name)
+  ${b('-d, --delete [name]')} Remove a bookmark (interactive if no name)
+  ${b('-r, --rename [o] [n]')} Rename a bookmark (interactive if args omitted)
   ${b('-l, --list')}          List bookmarks, most recently used first
   ${b('-p, --prune')}         Remove bookmarks whose paths no longer exist
   ${b('-h, --help')}          Show this help
+  ${b('-v, --version')}       Show the version
 
 ${colors.bold('Options:')}
+  ${b('-f, --force')}         With --add, overwrite an existing bookmark
   ${b('--no-color')}          Disable colored output
 `);
-}
-
-// Compact human-readable "time ago" for the list view.
-function timeAgo(ts) {
-  if (!ts) return 'never used';
-  const secs = Math.floor((Date.now() - ts) / 1000);
-  if (secs < 60) return 'just now';
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
 }
 
 // Main function
 async function main() {
   const rawArgs = process.argv.slice(2);
   configureColor(rawArgs);
-  // Strip the global `--no-color` flag so it can sit anywhere on the line
-  // without being mistaken for a command or bookmark name.
-  const args = rawArgs.filter(a => a !== '--no-color');
+  // The force flag may sit anywhere on the line; pull it out before positional
+  // parsing. `--no-color` is likewise global and stripped here.
+  const force = rawArgs.includes('--force') || rawArgs.includes('-f');
+  const args = rawArgs.filter((a) => a !== '--no-color' && a !== '--force' && a !== '-f');
   const config = loadConfig();
   const command = args[0];
 
-  // Handle help command  (go -h)
+  // goto -h / --help
   if (HELP_CMDS.includes(command)) {
     printHelp();
     return;
   }
 
-  // Handle add command  (go -a)
-  if (ADD_CMDS.includes(command)) {
-    const cwd = process.cwd();
-    const defaultName = path.basename(cwd);
-
-    const { locationName } = await promptWithEscSupport([
-      {
-        type: 'input',
-        name: 'locationName',
-        message: 'Enter a name for this location:',
-        default: defaultName,
-        validate: (input) => {
-          if (!input || input.trim().length === 0) {
-            return 'Location name cannot be empty';
-          }
-          if (config[input]) {
-            return `Location "${input}" already exists`;
-          }
-          return true;
-        }
-      }
-    ]);
-
-    // Add new location at the beginning (to show first in lists)
-    const newConfig = { [locationName]: cwd, ...config };
-    saveConfig(newConfig);
-    console.log(`Bookmark added: ${locationName} -> ${cwd}`);
+  // goto -v / --version
+  if (VERSION_CMDS.includes(command)) {
+    console.log(`goto v${pkg.version}`);
     return;
   }
 
-  // Handle delete command  (go -d)
+  // goto -a [name] [--force]
+  if (ADD_CMDS.includes(command)) {
+    const cwd = process.cwd();
+    let name = args[1];
+
+    // Prompt only when no name was given on the command line.
+    if (name === undefined) {
+      const answers = await promptWithEscSupport([
+        {
+          type: 'input',
+          name: 'locationName',
+          message: 'Enter a name for this location:',
+          default: path.basename(cwd),
+          validate: (input) => {
+            const res = validateName(input, config, { force });
+            return res.ok ? true : res.error;
+          },
+        },
+      ]);
+      name = answers.locationName;
+    }
+
+    const result = addBookmark(config, name, cwd, { force });
+    if (!result.ok) {
+      console.error(`Error: ${result.error}`);
+      process.exit(1);
+    }
+    saveConfig(result.config);
+    console.log(`Bookmark ${result.updated ? 'updated' : 'added'}: ${result.name} -> ${cwd}`);
+    return;
+  }
+
+  // goto -d [name]
   if (REMOVE_CMDS.includes(command)) {
     const locations = Object.keys(config);
-
     if (locations.length === 0) {
       console.log('No bookmarks to remove.');
       process.exit(0);
     }
 
-    console.log('\n[Press ESC to cancel]\n');
-    const { locationToRemove } = await promptWithEscSupport([
-      {
-        type: 'list',
-        name: 'locationToRemove',
-        message: 'Select a bookmark to remove:',
-        choices: locations
-      }
-    ]);
-
-    delete config[locationToRemove];
-    saveConfig(config);
-    // Drop its usage record too.
-    const usage = loadUsage();
-    if (usage[locationToRemove] !== undefined) {
-      delete usage[locationToRemove];
-      saveUsage(usage);
+    let name = args[1];
+    if (name === undefined) {
+      console.log('\n[Press ESC to cancel]\n');
+      const answers = await promptWithEscSupport([
+        {
+          type: 'list',
+          name: 'selected',
+          message: 'Select a bookmark to remove:',
+          choices: locations,
+        },
+      ]);
+      name = answers.selected;
     }
-    console.log(`Bookmark removed: ${locationToRemove}`);
+
+    const usage = loadUsage();
+    const result = removeBookmark(config, usage, name);
+    if (!result.ok) {
+      console.error(`Error: ${result.error}`);
+      process.exit(1);
+    }
+    saveConfig(result.config);
+    saveUsage(result.usage);
+    console.log(`Bookmark removed: ${result.name}`);
     return;
   }
 
-  // Handle list command  (go -l) — ordered by last used, most recent first
+  // goto -r [oldName] [newName]
+  if (RENAME_CMDS.includes(command)) {
+    const locations = Object.keys(config);
+    if (locations.length === 0) {
+      console.log('No bookmarks to rename.');
+      process.exit(0);
+    }
+
+    let oldName = args[1];
+    if (oldName === undefined) {
+      console.log('\n[Press ESC to cancel]\n');
+      const answers = await promptWithEscSupport([
+        {
+          type: 'list',
+          name: 'old',
+          message: 'Select a bookmark to rename:',
+          choices: locations,
+        },
+      ]);
+      oldName = answers.old;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(config, oldName)) {
+      console.error(`Error: Bookmark "${oldName}" not found`);
+      process.exit(1);
+    }
+
+    let newName = args[2];
+    if (newName === undefined) {
+      const { [oldName]: _omit, ...rest } = config;
+      const answers = await promptWithEscSupport([
+        {
+          type: 'input',
+          name: 'next',
+          message: `New name for "${oldName}":`,
+          default: oldName,
+          validate: (input) => {
+            const res = validateName(input, rest);
+            return res.ok ? true : res.error;
+          },
+        },
+      ]);
+      newName = answers.next;
+    }
+
+    const usage = loadUsage();
+    const result = renameBookmark(config, usage, oldName, newName);
+    if (!result.ok) {
+      console.error(`Error: ${result.error}`);
+      process.exit(1);
+    }
+    saveConfig(result.config);
+    saveUsage(result.usage);
+    console.log(`Bookmark renamed: ${result.oldName} -> ${result.newName}`);
+    return;
+  }
+
+  // goto -l — ordered by last used, most recent first
   if (LIST_CMDS.includes(command)) {
     const locations = Object.keys(config);
-
     if (locations.length === 0) {
-      console.log('No bookmarks saved yet. Use "go -a" to add one.');
+      console.log('No bookmarks saved yet. Use "goto -a" to add one.');
       process.exit(0);
     }
 
     const usage = loadUsage();
     const ordered = orderByLastUsed(locations, usage);
-    const pad = Math.max(...ordered.map(n => n.length));
+    const pad = Math.max(...ordered.map((n) => n.length));
 
     console.log('\n' + colors.bold('Bookmarks') + colors.dim(' (most recently used first):') + '\n');
-    ordered.forEach(name => {
+    ordered.forEach((name) => {
       // Pad on the visible text first, then color — padEnd must run before the
       // (zero-width) escape codes are added or alignment breaks.
       const label = colors.boldCyan(name.padEnd(pad));
@@ -292,40 +367,40 @@ async function main() {
     return;
   }
 
-  // Handle prune command  (go -p) — drop bookmarks whose paths no longer exist
+  // goto -p — drop bookmarks whose paths no longer exist
   if (PRUNE_CMDS.includes(command)) {
     const locations = Object.keys(config);
-
     if (locations.length === 0) {
-      console.log('No bookmarks saved yet. Use "go -a" to add one.');
+      console.log('No bookmarks saved yet. Use "goto -a" to add one.');
       process.exit(0);
     }
 
-    const missing = locations.filter(name => !fs.existsSync(config[name]));
+    const usage = loadUsage();
+    const { removed, config: nextConfig, usage: nextUsage } = pruneBookmarks(
+      config,
+      usage,
+      (p) => fs.existsSync(p)
+    );
 
-    if (missing.length === 0) {
+    if (removed.length === 0) {
       console.log(colors.green('All bookmarks point to existing paths. Nothing to prune.'));
       return;
     }
 
-    const usage = loadUsage();
-    missing.forEach(name => {
+    removed.forEach((name) => {
       console.log(`${colors.red('Removed')} ${colors.boldCyan(name)} ${colors.dim('->')} ${colors.dimStrike(config[name])}`);
-      delete config[name];
-      delete usage[name];
     });
-    saveConfig(config);
-    saveUsage(usage);
-    console.log('\n' + colors.green(`Pruned ${missing.length} stale bookmark${missing.length === 1 ? '' : 's'}.`));
+    saveConfig(nextConfig);
+    saveUsage(nextUsage);
+    console.log('\n' + colors.green(`Pruned ${removed.length} stale bookmark${removed.length === 1 ? '' : 's'}.`));
     return;
   }
 
-  // If no arguments, show interactive list to jump to a location
+  // No arguments — interactive list to jump to a location
   if (args.length === 0) {
     const locations = Object.keys(config);
-
     if (locations.length === 0) {
-      console.log('No bookmarks saved yet. Use "go -a" to add one.');
+      console.log('No bookmarks saved yet. Use "goto -a" to add one.');
       process.exit(0);
     }
 
@@ -338,25 +413,25 @@ async function main() {
         type: 'list',
         name: 'selectedLocation',
         message: 'Select a location to jump to:',
-        choices: ordered
-      }
+        choices: ordered,
+      },
     ]);
 
-    // Write the path to temp file for shell wrapper to read
-    setJumpTarget(config[selectedLocation]);
-    touchUsage(selectedLocation);
+    if (!jumpTo(selectedLocation, config)) {
+      process.exit(1);
+    }
     return;
   }
 
-  // Otherwise, treat argument as a location name
+  // Otherwise, treat the argument as a bookmark name to jump to.
   const locationName = command;
-
   if (config[locationName]) {
-    setJumpTarget(config[locationName]);
-    touchUsage(locationName);
+    if (!jumpTo(locationName, config)) {
+      process.exit(1);
+    }
   } else {
     console.error(`Error: Location "${locationName}" not found`);
-    console.error(`Use "go -l" to see available bookmarks or "go -a" to create one.`);
+    console.error('Use "goto -l" to see available bookmarks or "goto -a" to create one.');
     process.exit(1);
   }
 }
